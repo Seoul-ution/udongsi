@@ -51,12 +51,18 @@ if ($method !== 'GET') {
     json_error('Method Not Allowed', 405);
 }
 
-// 3-1 카테고리별 반찬 리스트 조회: /api/categories/{category}/dishes
-if (count($segments) === 2
-    && isset($segments[0])
-    && isset($segments[1]) && $segments[1] === 'dishes') {
+if (count($segments) >= 2
+    && end($segments) === 'dishes') {
 
-    $category = urldecode($segments[0]); // 카테고리명은 URL 인코딩될 수 있음
+    // 마지막 'dishes' 세그먼트를 제거합니다.
+    array_pop($segments);
+
+    // 남은 모든 세그먼트를 슬래시로 다시 결합하여 카테고리 이름으로 만듭니다.
+    $category = implode('/', $segments);
+
+    // 카테고리 이름이 URL 인코딩되었을 가능성에 대비하여 디코딩합니다.
+    $category = urldecode($category);
+
     handle_category_dishes($category);
 }
 
