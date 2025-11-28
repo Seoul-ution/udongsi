@@ -2,8 +2,6 @@
 // api/home.php
 // 홈 화면 관련 API
 // - GET /api/home/special?marketId=...
-// - GET /api/markets/{marketId}/stores
-// - GET /api/markets/{marketId}/stores/{storeId}/dishes
 
 require_once __DIR__ . '/../db/db.php';
 
@@ -65,16 +63,6 @@ if (count($segments) === 2 && $segments[0] === 'home' && $segments[1] === 'speci
     handle_home_special();
 }
 
-// **3️⃣ 특정 시장 가게 리스트 조회 (3 segments)**
-elseif (count($segments) === 3
-    && $segments[0] === 'markets'
-    && $segments[2] === 'stores'
-    && is_numeric($segments[1])) { // marketId 확인
-
-    $marketId = (int)$segments[1];
-    handle_market_stores($marketId);
-}
-
 // 404
 else {
     json_error('API Not Found', 404);
@@ -119,36 +107,3 @@ function handle_home_special()
         json_error('Server Error', 500);
     }
 }
-
-/**
- * GET /api/markets/{marketId}/stores
- * 특정 시장 가게 리스트 조회
- */
-function handle_market_stores($marketId)
-{
-    if ($marketId <= 0) json_error('Invalid marketId', 400);
-
-    $sql = "
-        SELECT
-            store_id AS storeId,
-            store_name AS storeName,
-            market_id AS marketId,
-            is_special
-        FROM store
-        WHERE market_id = :marketId
-        ORDER BY store_name ASC
-    ";
-
-    try {
-        $db = get_db();
-        $stmt = $db->prepare($sql);
-        $stmt->bindValue(':marketId', $marketId, PDO::PARAM_INT);
-        $stmt->execute();
-        $rows = $stmt->fetchAll();
-        json_ok($rows);
-    } catch (Exception $e) {
-        json_error('Server Error', 500);
-    }
-}
-
-
