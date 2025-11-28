@@ -1,13 +1,11 @@
-import { Bell, Menu, Plus, RefreshCw, Search, Star } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Image, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { SafeAreaView, StyleSheet, Alert, View, Text, Image, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { Menu, Bell, Search, Plus, RefreshCw, Star } from 'lucide-react-native';
 
-// 컴포넌트 불러오기
-import HotDealList from '../components/HotDealList';
 import MarketTabs from '../components/MarketTabs';
 import TimeFilter, { DeliveryTime } from '../components/TimeFilter';
+import HotDealList from '../components/HotDealList';
 
-// API 및 타입
 import { getCurrentUser, getMarketsByAddress, getStoresWithDishes } from '../api/homeApi';
 import { Market, StoreEntity } from '../api/types';
 
@@ -18,7 +16,6 @@ export default function HomePage({ navigation }: any) {
   const [stores, setStores] = useState<StoreEntity[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 1. 초기 로딩
   useEffect(() => {
     const init = async () => {
       try {
@@ -31,7 +28,6 @@ export default function HomePage({ navigation }: any) {
     init();
   }, []);
 
-  // 2. 데이터 페칭
   const fetchData = async () => {
     if (!selectedMarketId) return;
     setLoading(true);
@@ -45,43 +41,47 @@ export default function HomePage({ navigation }: any) {
 
   useEffect(() => { fetchData(); }, [selectedMarketId, period]);
 
+  // ✅ [수정된 부분] 헤더 렌더링
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity style={styles.iconBtn}>
+        <Menu color="#333" size={24} />
+      </TouchableOpacity>
+      
+      {/* 검색바 영역에 TouchableOpacity를 추가하여 검색 페이지로 이동 */}
+      <TouchableOpacity 
+        style={styles.searchBar} 
+        onPress={() => navigation.navigate('Search')} // 👈 Search 페이지로 이동
+        activeOpacity={0.8}
+      >
+        <Search color="#999" size={20} />
+        <Text style={styles.placeholder}>반찬 검색...</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity style={styles.iconBtn}>
+        <Bell color="#333" size={24} />
+        <View style={styles.badge} />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn}>
-          <Menu color="#333" size={24} />
-        </TouchableOpacity>
-        
-        <View style={styles.searchBar}>
-          <Search color="#999" size={20} />
-          <Text style={styles.placeholder}>반찬 검색...</Text>
-        </View>
-        
-        <TouchableOpacity style={styles.iconBtn}>
-          <Bell color="#333" size={24} />
-          <View style={styles.badge} />
-        </TouchableOpacity>
-      </View>
+      {renderHeader()} {/* 수정된 헤더 사용 */}
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
       >
-        {/* 시장 탭 */}
+        {/* MarketTabs, HotDealList, TimeFilter, StoreList... (나머지는 그대로 유지) */}
         <MarketTabs 
           markets={markets.map(m => ({ id: m.marketId as any, name: m.marketName }))} 
           selectedId={selectedMarketId as any} 
           onSelect={(id) => setSelectedMarketId(id as any)} 
         />
-
-        {/* 특가 공구 */}
         <HotDealList />
-
-        {/* 시간 필터 */}
         <TimeFilter selectedTime={period} onSelect={setPeriod} />
 
-        {/* 가게별 리스트 */}
         <View style={styles.storeList}>
           {stores.map((store) => (
             <View key={store.storeId} style={styles.storeCard}>
@@ -97,10 +97,8 @@ export default function HomePage({ navigation }: any) {
               {store.dishes.map((dish, idx) => (
                 <View key={dish.dishId} style={[styles.dishRow, idx !== store.dishes.length - 1 && styles.borderBottom]}>
                   <Image source={{ uri: dish.imageUrl || 'https://via.placeholder.com/150' }} style={styles.dishImg} />
-                  
                   <View style={{flex: 1}}>
                     <Text style={styles.dishName}>{dish.dishName}</Text>
-                    
                     <View style={styles.miniProgressBg}>
                       <View style={[styles.miniProgressFill, { width: `${(dish.currentCount / dish.threshold) * 100}%` }]} />
                     </View>
@@ -109,7 +107,6 @@ export default function HomePage({ navigation }: any) {
                       <Text style={styles.miniTextOrange}>{dish.threshold - dish.currentCount}개 필요</Text>
                     </View>
                   </View>
-
                   <View style={{alignItems: 'flex-end', marginLeft: 10}}>
                     <Text style={styles.dishPrice}>₩{dish.price.toLocaleString()}</Text>
                     <TouchableOpacity style={styles.addBtn} onPress={() => navigation.navigate('DishDetail', { dish })}>
@@ -129,11 +126,15 @@ export default function HomePage({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scrollContent: { paddingBottom: 100 },
+  
+  // 헤더 스타일
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   iconBtn: { padding: 4 },
   badge: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, backgroundColor: '#F97316', borderRadius: 4 },
-  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFE4C4', borderRadius: 20, paddingHorizontal: 12, height: 40, marginHorizontal: 12 },
+  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFE4C4', borderRadius: 20, paddingHorizontal: 12, height: 40, marginHorizontal: 12 }, // View에서 TouchableOpacity로 변경되지만, 스타일은 재사용
   placeholder: { marginLeft: 8, color: '#666', fontSize: 15 },
+  
+  // Store List Styles (나머지는 그대로 유지)
   storeList: { paddingHorizontal: 16 },
   storeCard: { backgroundColor: '#FFF', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#FFF7ED', padding: 16, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
   storeHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
