@@ -129,7 +129,7 @@ run_cart_test_case(
 
 // 6. (GET) 장바구니 비어있는 유저 조회 (404 기대)
 run_cart_test_case(
-    $BASE_URL . "?userId=non-existent-user-1234", 'GET', "GET 3: Empty Cart Check", 404
+    $BASE_URL . "?userId=2", 'GET', "GET 3: Empty Cart Check", 404
 );
 
 
