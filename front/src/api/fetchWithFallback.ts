@@ -3,13 +3,11 @@
 
 import { API_BASE_URL, FORCE_MOCK } from './config';
 
-// 제네릭 타입 T: 실제로 받고 싶은 데이터 타입
 export async function fetchJsonOrFallback<T>(
   path: string,
   mockData: T,
   init?: RequestInit,
 ): Promise<T> {
-  // 목업 강제 사용 옵션
   if (FORCE_MOCK) {
     console.warn(`[fetchJsonOrFallback] FORCE_MOCK=true → ${path} 에서 목업 사용`);
     return mockData;
@@ -19,7 +17,6 @@ export async function fetchJsonOrFallback<T>(
     const res = await fetch(`${API_BASE_URL}${path}`, init);
 
     if (!res.ok) {
-      // 4xx, 5xx 모두 목업으로 폴백
       console.warn(
         `[fetchJsonOrFallback] ${path} 응답 상태 코드: ${res.status}, 목업으로 폴백합니다.`,
       );
@@ -29,7 +26,6 @@ export async function fetchJsonOrFallback<T>(
     const data = (await res.json()) as T;
     return data;
   } catch (error) {
-    // 네트워크 에러, 서버 다운 등
     console.warn(
       `[fetchJsonOrFallback] ${path} 호출 중 에러 발생, 목업으로 폴백합니다.`,
       error,
@@ -37,3 +33,4 @@ export async function fetchJsonOrFallback<T>(
     return mockData;
   }
 }
+

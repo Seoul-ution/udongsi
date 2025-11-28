@@ -6,19 +6,19 @@ export type Period = 'AM' | 'PM';
 
 // [프론트 목업 전용] 사용자
 export interface User {
-  id: string;
+  id: number;
   address: string;
 }
 
 // [프론트 목업 전용] 시장
 export interface Market {
-  marketId: string;
+  marketId: number;
   marketName: string;
 }
 
 // [백엔드 DB 설계] 반찬 테이블 구조
 export interface DishBase {
-  dishId: string;
+  dishId: number;
   date: string;       // '2025-11-28'
   period: Period;     // 'AM' | 'PM'
   dishName: string;
@@ -29,9 +29,17 @@ export interface DishBase {
 
 // [백엔드 DB 설계] 가게 테이블 구조
 export interface StoreEntity {
-  storeId: string;
+  storeId: number;
   storeName: string;
-  marketId: string;
+  marketId: number;
   marketName: string;
-  dishes: DishBase[]; // 해당 가게의 반찬들
+  dishes: DishBase[]; 
+}
+
+// [장바구니 아이템]
+export interface CartItem {
+  cartItemId: number;
+  userId: number;
+  dishId: number;
+  quantity: number;
 }
