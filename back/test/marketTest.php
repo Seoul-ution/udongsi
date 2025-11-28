@@ -1,83 +1,106 @@
 <?php
-// tests/test_markets_api.php
-// Usage: php tests/test_markets_api.php [base_url]
+// tests/marketsTest.php
+// 파일: api/markets.php 기능 검증
 
-$BASE = isset($argv[1]) ? $argv[1] : 'http://localhost:8000';
+// ----------------- 테스트 유틸리티 -----------------
 
-// 간단한 HTTP GET (cURL)
-function http_get($url) {
+/**
+ * 특정 URL에 HTTP GET 요청을 보내고 결과를 반환합니다.
+ */
+function test_api_endpoint($url) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_HEADER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    $resp = curl_exec($ch);
-    if ($resp === false) {
-        $err = curl_error($ch);
-        curl_close($ch);
-        return array('ok' => false, 'error' => $err);
-    }
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    $header = substr($resp, 0, $headerSize);
-    $body = substr($resp, $headerSize);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    return array('ok' => true, 'status' => $status, 'header' => $header, 'body' => $body);
+
+    return ['code' => $httpCode, 'response' => $response];
 }
 
-$tests = array(
-    array('desc' => 'GET /api/markets', 'url' => $BASE . '/api/markets'),
-    array('desc' => 'GET /api/markets?address=서울시중구', 'url' => $BASE . '/api/markets?address=%EC%84%9C%EC%9A%B8%EC%8B%9C%EC%A4%91%EA%B5%AC'),
-    array('desc' => 'GET /api/markets/1', 'url' => $BASE . '/api/markets/1'),
-    array('desc' => 'GET /api/markets/1/stores', 'url' => $BASE . '/api/markets/1/stores'),
-    array('desc' => 'GET /api/markets/1/stores?isSpecial=1', 'url' => $BASE . '/api/markets/1/stores?isSpecial=1'),
+/**
+ * 테스트 케이스 실행 및 결과 출력
+ */
+function run_market_test_case($url, $description, $expected_status = 200) {
+    echo "Testing: $url ($description)\n";
+
+    $result = test_api_endpoint($url);
+    $httpCode = $result['code'];
+    $response = $result['response'];
+
+    $passed = $httpCode === $expected_status;
+    $status_msg = $passed ? "PASS" : "FAIL (Expected $expected_status, Got $httpCode)";
+
+    echo "HTTP Status: $httpCode [$status_msg]\n";
+
+    if ($passed && $expected_status === 200) {
+        $data = json_decode($response, true);
+        $resultData = isset($data['data']) ? $data['data'] : null;
+
+        if (isset($resultData['dishes'])) {
+            // 4. 가게별 반찬 조회 결과
+            echo "Result: Dishes Found (Store: " . $resultData['storeName'] . ", Count: " . count($resultData['dishes']) . ")\n";
+        } elseif (is_array($resultData) && isset($resultData[0]['storeName'])) {
+            // 3. 가게 리스트 조회 결과
+            echo "Result: Store List Found (Count: " . count($resultData) . ")\n";
+        } elseif (isset($resultData['marketName']) && !is_array($resultData['marketName'])) {
+            // 2. 시장 상세 조회 결과
+            echo "Result: Market Detail Found (Market ID: " . $resultData['marketId'] . ")\n";
+        } elseif (is_array($resultData) && isset($resultData[0]['marketName'])) {
+            // 1. 시장 목록 조회 결과
+            echo "Result: Market List Found (Count: " . count($resultData) . ")\n";
+        } else {
+            echo "Result: Data structure uncertain or empty.\n";
+        }
+    } elseif (!$passed) {
+        // 오류 응답 출력 (디버깅 용도)
+        echo "Raw Response: " . substr($response, 0, 80) . "...\n";
+    }
+
+    echo str_repeat("-", 50) . "\n\n";
+    return $passed;
+}
+
+
+// ----------------- 테스트 실행 -----------------
+
+// 1. 시장 목록 조회 (GET /api/markets)
+run_market_test_case(
+    "http://localhost:8000/api/markets",
+    "Market List (handle_markets)"
 );
 
-echo "Running " . count($tests) . " tests against base: {$BASE}\n\n";
+// 2. 특정 시장 상세 조회 (GET /api/markets/{marketId})
+run_market_test_case(
+    "http://localhost:8000/api/markets/1",
+    "Market Detail (handle_market_detail)"
+);
 
-foreach ($tests as $t) {
-    echo "---- " . $t['desc'] . " ----\n";
-    $res = http_get($t['url']);
-    if (!$res['ok']) {
-        echo "ERROR: cURL failed: " . $res['error'] . "\n\n";
-        continue;
-    }
-    echo "HTTP/Status: " . $res['status'] . "\n";
-    $body = $res['body'];
-    $json = json_decode($body, true);
-    if ($json === null) {
-        echo "WARNING: response is not valid JSON. Body:\n";
-        echo $body . "\n\n";
-        continue;
-    }
-    if (isset($json['message'])) {
-        echo "message: " . $json['message'] . "\n";
-    }
-    if (isset($json['data'])) {
-        if (is_array($json['data'])) {
+// 3. 특정 시장 가게 리스트 조회 (GET /api/markets/{marketId}/stores)
+run_market_test_case(
+    "http://localhost:8000/api/markets/1/stores",
+    "Store List (handle_market_stores)"
+);
 
-            // 리스트(array of arrays) 인지, 단일 객체인지 판별
-            $isList = array_keys($json['data']) === range(0, count($json['data']) - 1);
+// 4. 가게별 반찬 조회 (GET /api/markets/{marketId}/stores/{storeId}/dishes) - 이전 오류 경로
+run_market_test_case(
+    "http://localhost:8000/api/markets/1/stores/1/dishes",
+    "Store Dishes (handle_store_dishes)"
+);
 
-            if ($isList) {
-                echo "data: type=list, count=" . count($json['data']) . "\n";
-                if (count($json['data']) > 0 && is_array($json['data'][0])) {
-                    echo " first item keys: " . implode(',', array_keys($json['data'][0])) . "\n";
-                }
-            } else {
-                echo "data: type=object\n";
-                echo " keys: " . implode(',', array_keys($json['data'])) . "\n";
-            }
-        }
+// 5. 유효하지 않은 ID 테스트 (400 기대)
+run_market_test_case(
+    "http://localhost:8000/api/markets/0",
+    "Invalid Market ID",
+    400
+);
 
-    } else {
-        echo "note: 'data' 필드 없음\n";
-    }
-    if (isset($json['note'])) {
-        echo "note: " . $json['note'] . "\n";
-    }
-    echo "\n";
-}
+// 6. 존재하지 않는 경로 테스트 (404 기대)
+run_market_test_case(
+    "http://localhost:8000/api/markets/1/products",
+    "Non-existent path",
+    404
+);
 
-echo "Tests finished.\n";
+echo "Markets Tests finished.\n";
