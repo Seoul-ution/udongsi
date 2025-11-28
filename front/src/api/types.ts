@@ -16,15 +16,16 @@ export interface Market {
   marketName: string;
 }
 
-// [백엔드 DB 설계] 반찬 테이블 구조
 export interface DishBase {
   dishId: string;
-  date: string;       // '2025-11-28'
-  period: Period;     // 'AM' | 'PM'
+  date: string;
+  period: Period;
   dishName: string;
   price: number;
   currentCount: number;
   threshold: number;
+  // 👇 여기에 물음표(?)를 붙여서 있어도 되고 없어도 되는 값으로 추가
+  imageUrl?: string; 
 }
 
 // [백엔드 DB 설계] 가게 테이블 구조

@@ -1,12 +1,60 @@
-// front/App.tsx
-import { SafeAreaView, StatusBar } from 'react-native';
-import HomePage from './src/pages/HomePage';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack'; // 추가됨
+import { Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// 페이지들
+import CartPage from './src/pages/CartPage';
+import CategoryPage from './src/pages/CategoryPage';
+import DishDetailPage from './src/pages/DishDetailPage';
+import HomePage from './src/pages/HomePage';
+import OrderPage from './src/pages/OrderPage';
+import SearchPage from './src/pages/SearchPage';
+
+// 컴포넌트
+import BottomNav from './src/components/BottomNav';
+
+const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+// [임시] 마이 페이지
+const MyPage = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <Text>마이 페이지 준비중</Text>
+  </View>
+);
+
+// 1. 하단 탭 네비게이션 (메인 화면들)
+function MainTabNavigator() {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <BottomNav {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="Home" component={HomePage} options={{ title: '홈' }} />
+      <Tab.Screen name="Category" component={CategoryPage} options={{ title: '카테고리' }} />
+      <Tab.Screen name="Cart" component={CartPage} options={{ title: '장바구니' }} />
+      <Tab.Screen name="My" component={MyPage} options={{ title: '마이' }} />
+    </Tab.Navigator>
+  );
+}
+
+// 2. 전체 앱 네비게이션 (탭 + 상세 페이지들)
 export default function App() {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" />
-      <HomePage />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {/* 메인 탭 화면 */}
+          <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+          
+          {/* 탭바 없이 덮어씌워지는 상세 화면들 */}
+          <Stack.Screen name="Search" component={SearchPage} />
+          <Stack.Screen name="DishDetail" component={DishDetailPage} />
+          <Stack.Screen name="Order" component={OrderPage} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }

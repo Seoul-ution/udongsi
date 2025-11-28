@@ -1,195 +1,153 @@
-// src/pages/HomePage.tsx
-
+import { Bell, Menu, Plus, RefreshCw, Search, Star } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {
-  getCurrentUser,
-  getMarketsByAddress,
-  getStoresWithDishes,
-} from '../api/homeApi';
-import type { Market, Period, StoreEntity } from '../api/types';
+import { Image, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export default function HomePage() {
+// 컴포넌트 불러오기
+import HotDealList from '../components/HotDealList';
+import MarketTabs from '../components/MarketTabs';
+import TimeFilter, { DeliveryTime } from '../components/TimeFilter';
+
+// API 및 타입
+import { getCurrentUser, getMarketsByAddress, getStoresWithDishes } from '../api/homeApi';
+import { Market, StoreEntity } from '../api/types';
+
+export default function HomePage({ navigation }: any) {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>('AM');
+  const [period, setPeriod] = useState<DeliveryTime>('AM');
   const [stores, setStores] = useState<StoreEntity[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 1️⃣ 초기: 유저 → 주소 → 시장 리스트 가져오기
+  // 1. 초기 로딩
   useEffect(() => {
     const init = async () => {
-      setLoading(true);
       try {
         const user = await getCurrentUser();
         const marketList = await getMarketsByAddress(user.address);
         setMarkets(marketList);
-        if (marketList.length > 0) {
-          setSelectedMarketId(marketList[0].marketId);
-        }
-      } finally {
-        setLoading(false);
-      }
+        if (marketList.length > 0) setSelectedMarketId(marketList[0].marketId);
+      } catch (e) { console.error(e); }
     };
     init();
   }, []);
 
-  // 2️⃣ 선택된 시장/오전·오후에 맞는 가게+반찬 조회
-  useEffect(() => {
-    const fetchStores = async () => {
-      if (!selectedMarketId) return;
-      setLoading(true);
-      try {
-        const data = await getStoresWithDishes(selectedMarketId, period);
-        setStores(data);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStores();
-  }, [selectedMarketId, period]);
+  // 2. 데이터 페칭
+  const fetchData = async () => {
+    if (!selectedMarketId) return;
+    setLoading(true);
+    try {
+      const data = await getStoresWithDishes(selectedMarketId, period as any);
+      setStores(data);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const selectedMarket = markets.find((m) => m.marketId === selectedMarketId);
+  useEffect(() => { fetchData(); }, [selectedMarketId, period]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>우동시 🥘</Text>
-      <Text style={styles.subtitle}>우리 동네 시장 반찬 공동구매</Text>
-
-      {/* 시장 선택 탭 */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.marketTabs}
-      >
-        {markets.map((m) => {
-          const active = m.marketId === selectedMarketId;
-          return (
-            <Pressable
-              key={m.marketId}
-              onPress={() => setSelectedMarketId(m.marketId)}
-              style={[styles.marketTab, active && styles.marketTabActive]}
-            >
-              <Text
-                style={[
-                  styles.marketTabText,
-                  active && styles.marketTabTextActive,
-                ]}
-              >
-                {m.marketName}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* 오전/오후 필터 */}
-      <View style={styles.timeFilter}>
-        {(['AM', 'PM'] as Period[]).map((p) => {
-          const active = p === period;
-          return (
-            <Pressable
-              key={p}
-              onPress={() => setPeriod(p)}
-              style={[styles.timeButton, active && styles.timeButtonActive]}
-            >
-              <Text
-                style={[
-                  styles.timeButtonText,
-                  active && styles.timeButtonTextActive,
-                ]}
-              >
-                {p === 'AM' ? '오전' : '오후'}
-              </Text>
-            </Pressable>
-          );
-        })}
+    <SafeAreaView style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.iconBtn}>
+          <Menu color="#333" size={24} />
+        </TouchableOpacity>
+        
+        <View style={styles.searchBar}>
+          <Search color="#999" size={20} />
+          <Text style={styles.placeholder}>반찬 검색...</Text>
+        </View>
+        
+        <TouchableOpacity style={styles.iconBtn}>
+          <Bell color="#333" size={24} />
+          <View style={styles.badge} />
+        </TouchableOpacity>
       </View>
 
-      {/* 제목 */}
-      <Text style={styles.sectionTitle}>
-        {selectedMarket ? selectedMarket.marketName : '시장 선택 없음'} ·{' '}
-        {period === 'AM' ? '오전' : '오후'} 공구 반찬
-      </Text>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
+      >
+        {/* 시장 탭 */}
+        <MarketTabs 
+          markets={markets.map(m => ({ id: m.marketId as any, name: m.marketName }))} 
+          selectedId={selectedMarketId as any} 
+          onSelect={(id) => setSelectedMarketId(id as any)} 
+        />
 
-      {loading && <ActivityIndicator style={{ marginTop: 16 }} />}
+        {/* 특가 공구 */}
+        <HotDealList />
 
-      {!loading && (
-        <ScrollView style={styles.dishList}>
+        {/* 시간 필터 */}
+        <TimeFilter selectedTime={period} onSelect={setPeriod} />
+
+        {/* 가게별 리스트 */}
+        <View style={styles.storeList}>
           {stores.map((store) => (
-            <View key={store.storeId} style={styles.storeBlock}>
-              <Text style={styles.storeName}>{store.storeName}</Text>
-              {store.dishes.map((dish) => (
-                <View key={dish.dishId} style={styles.dishCard}>
-                  <Text style={styles.dishName}>{dish.dishName}</Text>
-                  <Text style={styles.price}>
-                    {dish.price.toLocaleString()}원
-                  </Text>
-                  <Text style={styles.progressText}>
-                    {dish.currentCount} / {dish.threshold}명
-                  </Text>
+            <View key={store.storeId} style={styles.storeCard}>
+              <View style={styles.storeHeader}>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <Text style={styles.storeName}>{store.storeName}</Text>
+                  <Star size={14} fill="#FFD700" color="#FFD700" style={{marginLeft: 4}} />
+                  <Text style={styles.storeRating}>125</Text>
+                </View>
+                <RefreshCw size={16} color="#999" />
+              </View>
+
+              {store.dishes.map((dish, idx) => (
+                <View key={dish.dishId} style={[styles.dishRow, idx !== store.dishes.length - 1 && styles.borderBottom]}>
+                  <Image source={{ uri: dish.imageUrl || 'https://via.placeholder.com/150' }} style={styles.dishImg} />
+                  
+                  <View style={{flex: 1}}>
+                    <Text style={styles.dishName}>{dish.dishName}</Text>
+                    
+                    <View style={styles.miniProgressBg}>
+                      <View style={[styles.miniProgressFill, { width: `${(dish.currentCount / dish.threshold) * 100}%` }]} />
+                    </View>
+                    <View style={styles.miniProgressLabel}>
+                      <Text style={styles.miniText}>{dish.currentCount}/{dish.threshold}</Text>
+                      <Text style={styles.miniTextOrange}>{dish.threshold - dish.currentCount}개 필요</Text>
+                    </View>
+                  </View>
+
+                  <View style={{alignItems: 'flex-end', marginLeft: 10}}>
+                    <Text style={styles.dishPrice}>₩{dish.price.toLocaleString()}</Text>
+                    <TouchableOpacity style={styles.addBtn} onPress={() => navigation.navigate('DishDetail', { dish })}>
+                      <Plus size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </View>
           ))}
-
-          {stores.length === 0 && (
-            <Text style={styles.emptyText}>
-              선택한 조건에 해당하는 반찬이 없어요 😥
-            </Text>
-          )}
-        </ScrollView>
-      )}
-    </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16, paddingTop: 40, backgroundColor: '#fff' },
-  title: { fontSize: 26, fontWeight: '800' },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 16 },
-  marketTabs: { marginBottom: 12 },
-  marketTab: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginRight: 8,
-  },
-  marketTabActive: { backgroundColor: '#ff7043', borderColor: '#ff7043' },
-  marketTabText: { fontSize: 13, color: '#555' },
-  marketTabTextActive: { color: '#fff', fontWeight: '600' },
-  timeFilter: { flexDirection: 'row', marginBottom: 12 },
-  timeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginRight: 8,
-  },
-  timeButtonActive: { backgroundColor: '#4caf50', borderColor: '#4caf50' },
-  timeButtonText: { fontSize: 13, color: '#555' },
-  timeButtonTextActive: { color: '#fff', fontWeight: '600' },
-  sectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 8 },
-  dishList: { flex: 1 },
-  storeBlock: { marginBottom: 12 },
-  storeName: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  dishCard: {
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  dishName: { fontSize: 14, fontWeight: '500' },
-  price: { fontSize: 13, fontWeight: '600' },
-  progressText: { fontSize: 12, color: '#999' },
-  emptyText: { marginTop: 20, fontSize: 13, color: '#888' },
+  container: { flex: 1, backgroundColor: '#fff' },
+  scrollContent: { paddingBottom: 100 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  iconBtn: { padding: 4 },
+  badge: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, backgroundColor: '#F97316', borderRadius: 4 },
+  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFE4C4', borderRadius: 20, paddingHorizontal: 12, height: 40, marginHorizontal: 12 },
+  placeholder: { marginLeft: 8, color: '#666', fontSize: 15 },
+  storeList: { paddingHorizontal: 16 },
+  storeCard: { backgroundColor: '#FFF', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#FFF7ED', padding: 16, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  storeHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  storeName: { fontSize: 16, fontWeight: 'bold' },
+  storeRating: { marginLeft: 4, color: '#666', fontSize: 13 },
+  dishRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  borderBottom: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  dishImg: { width: 50, height: 50, borderRadius: 25, marginRight: 12, backgroundColor: '#eee' },
+  dishName: { fontSize: 15, fontWeight: '500', marginBottom: 6 },
+  dishPrice: { fontSize: 14, fontWeight: 'bold', color: '#D97706', marginBottom: 6 },
+  miniProgressBg: { height: 4, backgroundColor: '#F3F4F6', borderRadius: 2, marginBottom: 4 },
+  miniProgressFill: { height: '100%', backgroundColor: '#F97316', borderRadius: 2 },
+  miniProgressLabel: { flexDirection: 'row', justifyContent: 'space-between' },
+  miniText: { fontSize: 10, color: '#999' },
+  miniTextOrange: { fontSize: 10, color: '#F97316', fontWeight: 'bold' },
+  addBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#84CC16', alignItems: 'center', justifyContent: 'center' },
 });
