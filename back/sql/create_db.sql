@@ -1,0 +1,4 @@
+-- DB 생성
+CREATE DATABASE udongsi
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_general_ci;
