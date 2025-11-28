@@ -50,21 +50,39 @@ if ($method !== 'GET') {
 
 // Routes:
 // - GET /api/markets            -> handle_markets()
-// - GET /api/markets?address=.. -> handle_markets() (address passed through)
+// - GET /api/markets/{id}/stores/{id}/dishes -> handle_store_dishes($id, $id) // ✨ 추가
 // - GET /api/markets/{id}       -> handle_market_detail($id)
 // - GET /api/markets/{id}/stores -> handle_market_stores($id)
 
-if (count($segments) === 0) {
-    handle_markets();
+// 1. 가게별 반찬 조회: /api/markets/{marketId}/stores/{storeId}/dishes (4 segments)
+if (count($segments) === 4
+    && isset($segments[0]) && is_numeric($segments[0]) // marketId
+    && isset($segments[1]) && $segments[1] === 'stores'
+    && isset($segments[2]) && is_numeric($segments[2]) // storeId
+    && isset($segments[3]) && $segments[3] === 'dishes') {
+
+    $marketId = (int)$segments[0];
+    $storeId = (int)$segments[2];
+    handle_store_dishes($marketId, $storeId);
 }
 
-// /api/markets/{marketId}  OR /api/markets/{marketId}/stores
-if (isset($segments[0]) && is_numeric($segments[0])) {
+// 2. 시장 가게 리스트 조회 및 시장 상세 조회 (기존 로직):
+//    이 로직은 4 세그먼트 요청을 건너뛰었으므로 안전합니다.
+elseif (count($segments) === 0) {
+    handle_markets();
+}
+elseif (isset($segments[0]) && is_numeric($segments[0])) {
     $marketId = (int)$segments[0];
     if (isset($segments[1]) && $segments[1] === 'stores') {
-        handle_market_stores($marketId);
+        // [수정된 부분]: 정확히 2 세그먼트인 경우만 처리하여 오버매칭 방지 (markets/id/stores)
+        if (count($segments) === 2) {
+            handle_market_stores($marketId);
+        }
     } else {
-        handle_market_detail($marketId);
+        // 1 세그먼트인 경우: /api/markets/{marketId}
+        if (count($segments) === 1) {
+            handle_market_detail($marketId);
+        }
     }
 }
 
@@ -182,4 +200,56 @@ function handle_market_stores($marketId)
     } catch (Exception $e) {
         json_error('Server Error', 500);
     }
+}
+
+
+/**
+ * GET /api/markets/{marketId}/stores/{storeId}/dishes
+ * 가게별 반찬 조회 (home.php에서 이관됨)
+ */
+function handle_store_dishes($marketId, $storeId)
+{
+    if ($marketId <= 0 || $storeId <= 0) json_error('Invalid IDs', 400);
+
+    $db = get_db();
+
+    // store 정보
+    $stmtStore = $db->prepare("SELECT store_id AS storeId, store_name AS storeName FROM store WHERE store_id = :storeId AND market_id = :marketId");
+    $stmtStore->bindValue(':storeId', $storeId, PDO::PARAM_INT);
+    $stmtStore->bindValue(':marketId', $marketId, PDO::PARAM_INT);
+    $stmtStore->execute();
+    $storeRow = $stmtStore->fetch(PDO::FETCH_ASSOC);
+
+    if (!$storeRow) json_error('Store Not Found', 404);
+
+    // dish 정보
+    $stmtDishes = $db->prepare("
+        SELECT
+            d.dish_id AS dishId,
+            d.date,
+            d.period,
+            d.dish_name AS dishName,
+            d.price,
+            IFNULL(ci_count.currentCount, 0) AS currentCount,
+            d.threshold
+        FROM dish d
+        LEFT JOIN (
+            SELECT dish_id, COUNT(*) AS currentCount
+            FROM cart_item
+            GROUP BY dish_id
+        ) ci_count ON d.dish_id = ci_count.dish_id
+        WHERE d.store_id = :storeId
+        ORDER BY d.dish_id ASC
+    ");
+    $stmtDishes->bindValue(':storeId', $storeId, PDO::PARAM_INT);
+    $stmtDishes->execute();
+    $dishes = $stmtDishes->fetchAll(PDO::FETCH_ASSOC);
+
+    $result = [
+        'storeId' => (int)$storeRow['storeId'],
+        'storeName' => $storeRow['storeName'],
+        'dishes' => $dishes ?: []
+    ];
+
+    json_ok($result);
 }
