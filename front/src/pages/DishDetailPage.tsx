@@ -1,3 +1,4 @@
+// front/src/pages/DishDetailPage.tsx
 import { ChevronLeft, Minus, Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

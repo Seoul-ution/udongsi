@@ -1,23 +1,63 @@
-import { Bell, Cookie, Drumstick, Fish, Leaf, Menu, Plus } from 'lucide-react-native';
+// front/src/pages/CategoryPage.tsx
+import { Bell, Carrot, Drumstick, Fish, Leaf, Menu, Plus } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { addToCart } from '../api/cartApi'; // cartApi.ts 파일에서 import
 
-import { getCategoryProducts } from '../api/categoryApi';
+// ❌ 기존: getCategoryProducts from '../api/categoryApi'
+// ✅ 변경: getDishesByCategory from '../api/homeApi' (또는 해당 API 파일)
+import { getDishesByCategory } from '../api/homeApi'; // 가정: homeApi.ts에 3-1 API 함수가 정의됨
 import TimeFilter, { DeliveryTime } from '../components/TimeFilter';
-// ✅ 장바구니 스토어 불러오기
 import { useCartStore } from '../store/cartStore';
+import { DishDetail } from '../api/types'; // DishDetail 타입 import
 
+// 카테고리 ID와 API에서 사용하는 이름(apiName)을 매핑
 const CATEGORIES = [
-  { id: 'fish', name: '생선', icon: Fish },
-  { id: 'meat', name: '육류', icon: Drumstick },
-  { id: 'vege', name: '나물', icon: Leaf },
-  { id: 'side', name: '김치/젓갈', icon: Cookie },
+  { id: 'fish', name: '생선', icon: Fish, apiName: '생선' },
+  { id: 'meat', name: '육류', icon: Drumstick, apiName: '육류' },
+  { id: 'vege', name: '나물', icon: Leaf, apiName: '나물/무침' },
+  { id: 'side', name: '김치/젓갈', icon: Carrot, apiName: '김치/젓갈' },
 ];
+
+// 헬퍼 함수: 백엔드에서 받은 단일 리스트 (DishDetail[])를 
+// 페이지가 기대하는 시장/가게별 그룹화 구조로 변환
+const groupDishesByMarketAndStore = (dishes: DishDetail[]) => {
+  const grouped: { [marketId: number]: { marketName: string, stores: any[] } } = {};
+  
+  dishes.forEach(dish => {
+    // 🚨 3-1 명세에는 Market ID가 없으므로, 모든 반찬을 하나의 가상 시장에 그룹화합니다.
+    // 만약 백엔드가 Market Name/ID를 주지 않는다면, 임시 Market ID 0 사용
+    const marketId = 0; 
+    const marketName = "전체 시장 상품"; 
+    
+    if (!grouped[marketId]) {
+      grouped[marketId] = { marketName, stores: [] };
+    }
+
+    let store = grouped[marketId].stores.find((s: any) => s.storeId === dish.storeId);
+    if (!store) {
+      store = { storeId: dish.storeId, storeName: dish.storeName, products: [] };
+      grouped[marketId].stores.push(store);
+    }
+    
+    // DishDetail을 prod 형태로 변환
+    store.products.push({
+      id: dish.dishId,
+      name: dish.dishName,
+      price: dish.price,
+      current: dish.currentCount,
+      total: dish.threshold,
+    });
+  });
+
+  return Object.values(grouped);
+};
+
 
 export default function CategoryPage({ navigation }: any) {
   const [activeCategory, setActiveCategory] = useState('fish');
   const [period, setPeriod] = useState<DeliveryTime>('AM');
-  const [marketData, setMarketData] = useState<any[]>([]);
+  const [marketData, setMarketData] = useState<any[]>([]); 
   const [loading, setLoading] = useState(false);
 
   // ✅ 장바구니 담기 함수 가져오기
@@ -27,8 +67,17 @@ export default function CategoryPage({ navigation }: any) {
     const loadData = async () => {
       setLoading(true);
       try {
-        const data = await getCategoryProducts(activeCategory, period);
-        setMarketData(data);
+        const selectedCat = CATEGORIES.find(c => c.id === activeCategory);
+        if (!selectedCat) return;
+
+        // 1. API 호출: homeApi.ts의 getDishesByCategory 사용
+        // 3-1 API는 period 필터링이 명시되지 않았으므로 period는 사용하지 않음 (백엔드 명세 확인 필요)
+        const rawData: DishDetail[] = await getDishesByCategory(selectedCat.apiName);
+        
+        // 2. 데이터 구조 변환: 단일 리스트를 시장/가게별로 그룹화
+        const groupedData = groupDishesByMarketAndStore(rawData);
+        setMarketData(groupedData);
+
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
       } finally {
@@ -36,29 +85,55 @@ export default function CategoryPage({ navigation }: any) {
       }
     };
     loadData();
-  }, [activeCategory, period]);
+  }, [activeCategory, period]); 
 
   // 상세 페이지로 이동
   const goToDetail = (prod: any) => {
     navigation.navigate('DishDetail', { 
-      dish: { ...prod, imageUrl: prod.img, rating: 4.5 } 
+      dish: { 
+        ...prod, 
+        dishId: prod.id, 
+        dishName: prod.name,
+        price: prod.price,
+        currentCount: prod.current,
+        threshold: prod.total,
+        imageUrl: prod.img, 
+        rating: 4.5 
+      } 
     });
   };
 
-  // ✅ 장바구니 담기 핸들러
-  const handleAddToCart = (prod: any) => {
-    addItem({
-      id: prod.id,
-      name: prod.name,
-      price: prod.price,
-      quantity: 1, // 기본 1개 담기
-      imageUrl: prod.img,
-    });
+  const TEMP_USER_ID = 1;
 
-    Alert.alert('장바구니', `${prod.name}을(를) 담았습니다.`, [
-      { text: '계속 쇼핑', style: 'cancel' },
-      { text: '확인', onPress: () => navigation.navigate('Cart') } // 장바구니로 이동
-    ]);
+  // ✅ 장바구니 담기 핸들러
+  const handleAddToCart = async (prod: any) => {
+    try {
+      // 1. API 호출: 장바구니에 아이템 추가 요청
+      const request = {
+        userId: TEMP_USER_ID, // 임시 ID 사용
+        dishId: prod.id,
+        quantity: 1, // 기본 1개 담기
+      };
+      
+      const addedItem = await addToCart(request);
+
+      // 2. API 성공 시에만 스토어 상태 업데이트
+      addItem({
+        id: addedItem.dishId, // API 응답에서 dishId 사용
+        name: addedItem.dishName, // API 응답에서 dishName 사용
+        price: addedItem.price, // API 응답에서 price 사용
+        quantity: addedItem.quantity, // API 응답에서 quantity 사용
+      });
+
+      Alert.alert('장바구니', `${addedItem.dishName}을(를) 담았습니다.`, [
+        { text: '계속 쇼핑', style: 'cancel' },
+        { text: '확인', onPress: () => navigation.navigate('Cart') }
+      ]);
+      
+    } catch (error) {
+      console.error("장바구니 API 호출 실패:", error);
+      Alert.alert('오류', '장바구니 담기에 실패했습니다. 다시 시도해 주세요.');
+    }
   };
 
   return (
@@ -94,7 +169,7 @@ export default function CategoryPage({ navigation }: any) {
         </View>
 
         <View style={styles.filterRow}>
-          <TimeFilter selectedTime={period} onSelect={setPeriod} />
+          <TimeFilter selectedTime={period} onSelect={setPeriod} /> 
         </View>
 
         {loading ? (
@@ -126,16 +201,20 @@ export default function CategoryPage({ navigation }: any) {
                           
                           <View style={styles.prodInfo}>
                             <Text style={styles.prodName}>{prod.name}</Text>
-                            <Text style={styles.stockText}>{prod.current}/{prod.total}</Text>
+                            <Text style={styles.stockText}>
+                              {prod.current}/{prod.total}
+                            </Text>
                           </View>
 
                           <View style={styles.priceArea}>
                             <Text style={styles.price}>₩{prod.price.toLocaleString()}</Text>
                             
-                            {/* ✅ + 버튼 누르면 장바구니 담기 실행 */}
                             <TouchableOpacity 
                               style={styles.addBtn}
-                              onPress={() => handleAddToCart(prod)}
+                              onPress={(e) => {
+                                e.stopPropagation(); 
+                                handleAddToCart(prod);
+                              }}
                             >
                               <Plus size={16} color="#FFF" />
                             </TouchableOpacity>

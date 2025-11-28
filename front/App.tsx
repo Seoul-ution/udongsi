@@ -1,3 +1,4 @@
+// front/App.tsx
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack'; // 추가됨
@@ -11,6 +12,7 @@ import DishDetailPage from './src/pages/DishDetailPage';
 import HomePage from './src/pages/HomePage';
 import OrderPage from './src/pages/OrderPage';
 import SearchPage from './src/pages/SearchPage';
+import MyPage from './src/pages/MyPage';
 
 // 컴포넌트
 import BottomNav from './src/components/BottomNav';
@@ -18,12 +20,15 @@ import BottomNav from './src/components/BottomNav';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// [임시] 마이 페이지
-const MyPage = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>마이 페이지 준비중</Text>
-  </View>
-);
+/*
+const MyPage = () => {
+  return (
+    <View style={{ flex: 1, backgroundColor: 'tomato', justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: 'white', fontSize: 20 }}>TEST MY PAGE</Text>
+    </View>
+  );
+};
+*/
 
 // 1. 하단 탭 네비게이션 (메인 화면들)
 function MainTabNavigator() {
@@ -35,7 +40,7 @@ function MainTabNavigator() {
       <Tab.Screen name="Home" component={HomePage} options={{ title: '홈' }} />
       <Tab.Screen name="Category" component={CategoryPage} options={{ title: '카테고리' }} />
       <Tab.Screen name="Cart" component={CartPage} options={{ title: '장바구니' }} />
-      <Tab.Screen name="My" component={MyPage} options={{ title: '마이' }} />
+      <Tab.Screen name="My" component={MyPage} options={{ title: '마이페이지' }} />
     </Tab.Navigator>
   );
 }

@@ -1,3 +1,4 @@
+// front/src/components/DishCard.tsx
 import { Plus, Star } from 'lucide-react-native';
 import React from 'react';
 import { GestureResponderEvent, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -8,7 +9,9 @@ export interface Dish {
   price: number;
   rating?: number;
   imageUrl: string;
-  // 필요시 추가 필드 정의
+  current: number;
+  total: number;
+  storeName: string;
 }
 
 interface DishCardProps {

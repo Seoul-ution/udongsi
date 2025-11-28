@@ -1,66 +1,176 @@
-import { Check, ChevronLeft, Minus, Plus } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useCartStore } from '../store/cartStore';
+// front/src/pages/CartPage.tsx
 
-// UI 구현을 위한 확장 타입
-interface UI_CartItem {
-  id: number | string;
-  name: string;
-  price: number;
-  quantity: number;
-  marketName: string;
+import { Check, ChevronLeft, Minus, Plus } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// NOTE: shallow 제거
+import { useCartStore, CartItem as StoreCartItem } from '../store/cartStore'; 
+
+// UI_CartItem 타입 정의 (Mock 데이터 포함)
+interface UI_CartItem extends StoreCartItem {
   storeName: string;
+  marketName: string; 
   deliveryFee: number;
+  
+  // UI_CartItem이 필요로 하는 기타 필드 (타입 충족용 임시 Mock)
+  dishId: number;
+  storeId: number;
+  dishType: string;
+  date: string;
+  period: 'AM' | 'PM';
+  currentCount: number;
+  threshold: number;
 }
 
+// ------------------------
+// 🚨 MOCK DATA DEFINITION 🚨
+// ------------------------
+const MOCK_CART_ITEMS: Omit<UI_CartItem, 'dishId' | 'storeId' | 'dishType' | 'date' | 'period' | 'currentCount' | 'threshold'>[] = [
+    {
+        id: 101, 
+        name: '돼지불고기 (200g)',
+        price: 8500,
+        quantity: 2, 
+        imageUrl: 'https://via.placeholder.com/150/ff7f7f',
+        storeName: '서울 반찬가게',
+        marketName: '망원시장',
+        deliveryFee: 3000,
+    },
+    {
+        id: 102, 
+        name: '오징어채 볶음 (150g)',
+        price: 4000,
+        quantity: 1, 
+        imageUrl: 'https://via.placeholder.com/150/7f7fff',
+        storeName: '강남 반찬집',
+        marketName: '신촌시장',
+        deliveryFee: 2500,
+    },
+    {
+        id: 103, 
+        name: '계란말이',
+        price: 5000,
+        quantity: 3, 
+        imageUrl: 'https://via.placeholder.com/150/7fff7f',
+        storeName: '서울 반찬가게',
+        marketName: '망원시장',
+        deliveryFee: 3000,
+    },
+    {
+        id: 104, 
+        name: '배추김치 (1kg)',
+        price: 9000,
+        quantity: 1, 
+        imageUrl: 'https://via.placeholder.com/150/ff7f7f',
+        storeName: '김치명인',
+        marketName: '영동시장', 
+        deliveryFee: 4000,
+    },
+];
+
 export default function CartPage({ navigation }: any) {
-  const rawCartItems = useCartStore((state) => state.items);
-  const updateQuantity = useCartStore((state) => state.updateQuantity);
-  const removeItem = useCartStore((state) => state.removeItem);
+  
+  // Zustand 상태 및 액션 가져오기 (shallow 제거)
+  const { items, removeItem, updateQuantity, setItems } = useCartStore((state) => ({
+    items: state.items,
+    removeItem: state.removeItem, 
+    updateQuantity: state.updateQuantity, 
+    setItems: state.setItems, 
+  })); 
+  
+  const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set()); 
+  
+  // Mock 데이터 초기 로딩 함수 (최초 1회만 실행)
+  const loadMockCartItems = useCallback(() => {
+    if (items.length === 0) { 
+        const storeItems: StoreCartItem[] = MOCK_CART_ITEMS.map(item => ({
+             id: item.id,
+             name: item.name,
+             price: item.price,
+             quantity: item.quantity,
+             imageUrl: item.imageUrl,
+        }));
+        setItems(storeItems); 
+    }
+    setLoading(false);
+  }, [items.length, setItems]); 
 
-  // [UI용 데이터 변환]
-  const cartItems: UI_CartItem[] = useMemo(() => {
-    return rawCartItems.map((item, index) => ({
-      ...item,
-      marketName: index % 2 === 0 ? '망원시장' : '신촌시장', 
-      storeName: index % 3 === 0 ? '△△ 가게' : '★★ 가게', 
-      deliveryFee: 300,
-    }));
-  }, [rawCartItems]);
-
-  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
-
+  // 1. useEffect: 최초 마운트 시 Mock 데이터 로드
   React.useEffect(() => {
-    setSelectedIds(new Set(cartItems.map(i => i.id)));
-  }, [cartItems.length]);
+    loadMockCartItems(); 
+  }, [loadMockCartItems]); 
+  
+  // 2. useEffect: items가 업데이트될 때마다 모든 항목을 기본 선택 상태로 유지
+  React.useEffect(() => {
+    const itemIds = items.map(i => i.id); 
+    setSelectedIds(new Set(itemIds)); 
+  }, [items]); 
 
-  const toggleSelection = (id: string | number) => {
+  // UI용 데이터 변환 (StoreCartItem -> UI_CartItem)
+  const cartItems: UI_CartItem[] = useMemo(() => {
+    return items.map((item: StoreCartItem) => {
+        const mockInfo = MOCK_CART_ITEMS.find(m => m.id === item.id) || {
+            storeName: '임시 가게',
+            marketName: '임시 시장',
+            deliveryFee: 3000,
+        };
+        
+        return { 
+            ...item, 
+            dishId: item.id,
+            storeName: mockInfo.storeName,
+            marketName: mockInfo.marketName, 
+            deliveryFee: mockInfo.deliveryFee,
+            // 나머지 타입 충족용 목업 필드 (임시 값)
+            storeId: item.id % 2 === 0 ? 2 : 1,
+            dishType: '밑반찬',
+            date: '2025-01-01', 
+            period: item.id % 2 === 0 ? 'PM' : 'AM',
+            currentCount: 1, 
+            threshold: 10, 
+        } as UI_CartItem; 
+    });
+  }, [items]); 
+  
+  // ------------------------------------------------
+  // 🚨 Handlers: ZUSTAND ACTIONS 직접 사용 🚨
+  // ------------------------------------------------
+
+  // 항목 삭제 핸들러 (Store 액션 직접 호출)
+  const handleRemoveItem = useCallback((dishId: number) => { 
+    removeItem(dishId);
+  }, [removeItem]); 
+  
+  // 수량 변경 핸들러 (Store 액션 직접 호출)
+  const handleUpdateQuantity = useCallback((dishId: number, delta: number) => { 
+    updateQuantity(dishId, delta);
+  }, [updateQuantity]); 
+  
+  // 수량 감소 핸들러 (1개일 때 삭제 처리)
+  const handleDecrease = useCallback((item: UI_CartItem) => { 
+    if (item.quantity <= 1) {
+      Alert.alert('삭제', '선택하신 상품을 장바구니에서 삭제하시겠습니까?', [
+        { text: '취소', style: 'cancel' },
+        { text: '삭제', style: 'destructive', onPress: () => { handleRemoveItem(item.id); } },
+      ]);
+    } else {
+      handleUpdateQuantity(item.id, -1);
+    }
+  }, [handleRemoveItem, handleUpdateQuantity]); 
+  
+  // 선택/해제 토글
+  const toggleSelection = (id: number) => { 
     const newSet = new Set(selectedIds);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setSelectedIds(newSet);
   };
-
-  // ✅ 수량 감소 핸들러 (1개일 때 삭제 물어보기)
-  const handleDecrease = (item: UI_CartItem) => {
-    if (item.quantity <= 1) {
-      Alert.alert('삭제', '선택하신 상품을 장바구니에서 삭제하시겠습니까?', [
-        { text: '취소', style: 'cancel' },
-        { 
-          text: '삭제', 
-          style: 'destructive', 
-          onPress: () => removeItem(item.id) 
-        },
-      ]);
-    } else {
-      updateQuantity(item.id, -1);
-    }
-  };
-
+  
+  // 시장별 그룹핑 및 가격 계산 로직 (기존과 동일)
   const groupedItems = useMemo(() => {
     const markets: Record<string, { deliveryFee: number, stores: Record<string, UI_CartItem[]> }> = {};
-
     cartItems.forEach(item => {
       if (!markets[item.marketName]) {
         markets[item.marketName] = { deliveryFee: item.deliveryFee, stores: {} };
@@ -73,37 +183,47 @@ export default function CartPage({ navigation }: any) {
     return markets;
   }, [cartItems]);
 
-  const selectedItems = cartItems.filter(item => selectedIds.has(item.id));
-  const productPrice = selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const selectedItems = cartItems.filter(item => selectedIds.has(item.id)); 
   
+  const productPrice = selectedItems.reduce((sum, item) => {
+    return sum + (item.price * item.quantity);
+  }, 0);
+  
+  // 선택된 상품이 속한 시장만 배달비 계산
   const activeMarkets = new Set(selectedItems.map(i => i.marketName));
+  
   const totalDeliveryFee = Array.from(activeMarkets).reduce((sum, marketName) => {
     const marketItem = cartItems.find(i => i.marketName === marketName);
     return sum + (marketItem ? marketItem.deliveryFee : 0);
   }, 0);
 
   const totalPrice = productPrice + totalDeliveryFee;
-
+  
   const handleOrderPress = () => {
     if (selectedItems.length === 0) {
       Alert.alert('알림', '주문할 상품을 선택해주세요.');
       return;
     }
-    navigation.navigate('Order', { totalPrice });
+    Alert.alert('주문 준비', `총 ${totalPrice.toLocaleString()}원으로 주문을 진행합니다.`);
+    // navigation.navigate('Order', { totalPrice }); 
   };
-
+  
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ChevronLeft size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>장바구니 ({cartItems.length})</Text>
+        <Text style={styles.headerTitle}>장바구니 ({loading ? '...' : cartItems.length})</Text> 
         <View style={{ width: 24 }} /> 
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {cartItems.length === 0 ? (
+        {loading ? ( 
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#F97316" />
+          </View>
+        ) : cartItems.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>장바구니가 비어있습니다.</Text>
           </View>
@@ -112,7 +232,10 @@ export default function CartPage({ navigation }: any) {
             <View key={marketName} style={styles.marketSection}>
               <View style={styles.marketHeader}>
                 <Text style={styles.marketName}>{marketName}</Text>
-                <Text style={styles.deliveryFee}>+{marketInfo.deliveryFee}원</Text>
+                {/* 선택된 상품이 해당 시장에 있을 때만 배달비 표시 */}
+                {activeMarkets.has(marketName) && (
+                    <Text style={styles.deliveryFee}>+{marketInfo.deliveryFee.toLocaleString()}원</Text>
+                )}
               </View>
 
               {Object.entries(marketInfo.stores).map(([storeName, items]) => (
@@ -120,7 +243,7 @@ export default function CartPage({ navigation }: any) {
                   <Text style={styles.storeName}>{storeName}</Text>
                   
                   {items.map((item) => (
-                    <View key={item.id} style={styles.itemRow}>
+                    <View key={item.id} style={styles.itemRow}> 
                       <TouchableOpacity 
                         onPress={() => toggleSelection(item.id)}
                         style={[styles.checkbox, selectedIds.has(item.id) && styles.checkboxChecked]}
@@ -134,12 +257,11 @@ export default function CartPage({ navigation }: any) {
                       </View>
 
                       <View style={styles.qtyControl}>
-                        {/* ✅ handleDecrease 함수 연결 */}
                         <TouchableOpacity onPress={() => handleDecrease(item)} style={styles.qtyBtn}>
                           <Minus size={14} color="#666" />
                         </TouchableOpacity>
                         <Text style={styles.qtyText}>{item.quantity}</Text>
-                        <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
+                        <TouchableOpacity onPress={() => handleUpdateQuantity(item.id, 1)} style={styles.qtyBtn}>
                           <Plus size={14} color="#666" />
                         </TouchableOpacity>
                       </View>
@@ -151,7 +273,7 @@ export default function CartPage({ navigation }: any) {
           ))
         )}
 
-        {cartItems.length > 0 && (
+        {cartItems.length > 0 && !loading && (
           <View style={styles.summaryContainer}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>상품 금액</Text>
@@ -174,13 +296,13 @@ export default function CartPage({ navigation }: any) {
         )}
       </ScrollView>
 
-      {cartItems.length > 0 && (
+      {cartItems.length > 0 && !loading && (
         <View style={styles.footer}>
           <TouchableOpacity 
             style={styles.orderBtn}
             onPress={handleOrderPress}
           >
-            <Text style={styles.orderBtnText}>우동시 주문하기</Text>
+            <Text style={styles.orderBtnText}>₩{totalPrice.toLocaleString()} 우동시 주문하기</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -200,6 +322,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 100 },
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { color: '#888', fontSize: 16 },
+  loadingContainer: { padding: 40, alignItems: 'center' },
   marketSection: { 
     marginTop: 12, backgroundColor: '#FFF', 
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#EEE',

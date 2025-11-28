@@ -1,26 +1,34 @@
+// front/src/store/cartStore.ts
 import { create } from 'zustand';
 
-// 장바구니에 담길 아이템 타입
+// 장바구니에 담길 아이템 타입 (id는 number로 통일)
 export interface CartItem {
-  id: string | number;
+  id: number; 
   name: string;
   price: number;
-  quantity: number;
+  quantity: number; 
   imageUrl?: string;
 }
 
 interface CartState {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (id: string | number) => void;
-  updateQuantity: (id: string | number, delta: number) => void;
+  removeItem: (id: number) => void; 
+  updateQuantity: (id: number, delta: number) => void; 
   clearCart: () => void;
+  // Mock 데이터 배열을 직접 받습니다.
+  setItems: (newItems: CartItem[]) => void; 
 }
 
 export const useCartStore = create<CartState>((set) => ({
   items: [],
   
-  // 장바구니 추가 로직 (이미 있으면 수량 +1)
+  // ✅ Mock 데이터 혹은 Store 타입 그대로 받을 때의 setItems
+  setItems: (newItems) => set({ 
+    items: newItems // 단순 할당
+  }),
+
+  // 장바구니 추가 로직
   addItem: (newItem) => set((state) => {
     const existingItem = state.items.find(i => i.id === newItem.id);
     if (existingItem) {
@@ -30,6 +38,7 @@ export const useCartStore = create<CartState>((set) => ({
         ),
       };
     }
+    // 새 상품은 quantity를 1로 설정하여 추가
     return { items: [...state.items, { ...newItem, quantity: 1 }] };
   }),
 
@@ -43,12 +52,12 @@ export const useCartStore = create<CartState>((set) => ({
     items: state.items.map(i => {
       if (i.id === id) {
         const newQty = i.quantity + delta;
-        return newQty > 0 ? { ...i, quantity: newQty } : i;
+        // 수량이 1 이상일 경우에만 업데이트
+        return newQty > 0 ? { ...i, quantity: newQty } : i; 
       }
       return i;
     })
   })),
 
-  // 전체 비우기
   clearCart: () => set({ items: [] }),
 }));

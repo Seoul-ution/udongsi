@@ -1,5 +1,6 @@
-// 실제 서버 주소 (나중에는 .env 파일로 관리)
-const BASE_URL = 'https://api.your-backend.com'; 
+// front/src/api/categoryApi.ts
+import { fetchJsonOrFallback } from './fetchWithFallback';
+
 
 // [목업 데이터] 카테고리별로 다른 데이터를 정의합니다.
 const MOCK_DB: Record<string, any[]> = {
@@ -77,30 +78,14 @@ const MOCK_DB: Record<string, any[]> = {
 };
 
 export const getCategoryProducts = async (category: string, period: string) => {
-  // 로딩 효과를 위해 0.3초 대기
-  await new Promise(resolve => setTimeout(resolve, 300));
+  // 0. 로딩 연출용 딜레이 (선택)
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
-  try {
-    // 1. 서버에 요청 보내기 (GET 요청) - 실제 백엔드 연동 시 주석 해제
-    /*
-    const response = await fetch(`${BASE_URL}/categories/${category}?period=${period}`);
-    
-    // 2. 응답 성공 여부 확인
-    if (!response.ok) {
-      throw new Error('데이터 불러오기 실패');
-    }
+  // 1. API 명세에 맞춘 경로
+  const path = `/categories/${category}/dishes?period=${period}`;
 
-    // 3. JSON 데이터로 변환해서 반환
-    const data = await response.json();
-    return data; 
-    */
+  // 2. 서버 호출 못 하거나 에러 나면 → 목업(MOCK_DB[category])로 fallback
+  const fallback = MOCK_DB[category] || [];
 
-    // [임시] 백엔드가 없으므로, 위에서 만든 목업 데이터를 반환합니다.
-    // 해당 카테고리 데이터가 없으면 빈 배열 반환
-    return MOCK_DB[category] || []; 
-    
-  } catch (error) {
-    console.error(error);
-    return []; // 에러 나면 빈 배열 반환
-  }
+  return fetchJsonOrFallback<any[]>(path, fallback);
 };

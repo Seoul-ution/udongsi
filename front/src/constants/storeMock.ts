@@ -4,13 +4,13 @@ import type { StoreEntity } from '../api/types';
 
 export const STORE_MOCK: StoreEntity[] = [
   {
-    storeId: 'store-1',
+    storeId: 1,
     storeName: '김네집 반찬',
-    marketId: 'market-1',
+    marketId: 1,
     marketName: '망원시장',
     dishes: [
       {
-        dishId: 'dish-1',
+        dishId: 1,
         date: '2025-11-28',
         period: 'AM',
         dishName: '우엉볶음 200g',
@@ -19,7 +19,7 @@ export const STORE_MOCK: StoreEntity[] = [
         threshold: 10,
       },
       {
-        dishId: 'dish-2',
+        dishId: 2,
         date: '2025-11-28',
         period: 'PM',
         dishName: '고등어 구이 1마리',
@@ -30,13 +30,13 @@ export const STORE_MOCK: StoreEntity[] = [
     ],
   },
   {
-    storeId: 'store-2',
+    storeId: 2,
     storeName: '이모네 반찬',
-    marketId: 'market-2',
+    marketId: 2,
     marketName: '마포시장',
     dishes: [
       {
-        dishId: 'dish-3',
+        dishId: 3,
         date: '2025-11-28',
         period: 'AM',
         dishName: '잡채 300g',
