@@ -132,14 +132,20 @@ function handle_post_cart_items()
     }
 
     $db = get_db();
+    // 2. dishId 유효성 검사 (트랜잭션 시작 전에 수행)
+    $stmtDish = $db->prepare("SELECT 1 FROM dish WHERE dish_id = :dishId");
+    $stmtDish->bindValue(':dishId', $dishId, PDO::PARAM_INT);
+    $stmtDish->execute();
+
+    // Dish가 존재하지 않으면 (false 반환) 404 반환하고 함수 종료
+    if (!$stmtDish->fetch()) {
+        json_error('Dish Not Found.', 404); // <-- 404가 여기서 즉시 반환되어야 함
+    }
+
     try {
         $db->beginTransaction(); // 이제 $db 객체를 사용할 수 있음
-        // 2. dishId 유효성 검사 (Dish가 존재하는지 확인)
-        $stmtDish = $db->prepare("SELECT 1 FROM dish WHERE dish_id = :dishId");
-        // ... (유효성 검사는 그대로 유지)
 
         // 3. 삽입 또는 업데이트 (UPSERT)
-
         // 3-A. 새로운 cart_item_id 결정 (PK 수동 할당)
         $next_id = null;
         // UPDATE 전에 새로운 ID를 준비할 필요는 없지만, INSERT를 위해 ID가 필요합니다.
